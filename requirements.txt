@@ -2,3 +2,5 @@ llama-cpp-python
 openai
 print-color
 PyQt6
+PyQt6-Qt6
+PyQt6-sip

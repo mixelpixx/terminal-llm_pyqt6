@@ -1,6 +1,7 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton, QLineEdit, QLabel, QComboBox, QMessageBox, QInputDialog
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton, QLineEdit, QLabel, QComboBox, QMessageBox, QInputDialog, QScrollArea
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont, QPalette, QColor
 from modules.functions import create_file, create_idea, load_idea, delete_idea, list_ideas
 from modules.helpers import model_selector, llama_args, char_selector
 from llama_cpp import Llama
@@ -10,7 +11,7 @@ class LLMChatGUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("LLM Chat Interface")
-        self.setGeometry(100, 100, 800, 600)
+        self.setGeometry(100, 100, 1000, 700)
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -19,39 +20,48 @@ class LLMChatGUI(QMainWindow):
         self.setup_ui()
         self.load_config()
         self.initialize_llm()
+        self.apply_dark_theme()
 
     def setup_ui(self):
+        # Header
+        header_layout = QHBoxLayout()
+        self.header_label = QLabel("LLM Chat Interface")
+        self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header_layout.addWidget(self.header_label)
+        self.layout.addLayout(header_layout)
+
         # Chat area
-        self.chat_area = QTextEdit()
-        self.chat_area.setReadOnly(True)
-        self.layout.addWidget(self.chat_area)
+        chat_scroll = QScrollArea()
+        chat_scroll.setWidgetResizable(True)
+        chat_content = QWidget()
+        self.chat_layout = QVBoxLayout(chat_content)
+        self.chat_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        chat_scroll.setWidget(chat_content)
+        self.layout.addWidget(chat_scroll, 1)
 
         # Input area
         input_layout = QHBoxLayout()
         self.input_field = QLineEdit()
+        self.input_field.setPlaceholderText("Type your message here...")
         self.send_button = QPushButton("Send")
         self.send_button.clicked.connect(self.send_message)
-        input_layout.addWidget(self.input_field)
-        input_layout.addWidget(self.send_button)
+        input_layout.addWidget(self.input_field, 7)
+        input_layout.addWidget(self.send_button, 1)
         self.layout.addLayout(input_layout)
 
         # Function buttons
         function_layout = QHBoxLayout()
-        self.create_file_button = QPushButton("Create File")
-        self.create_file_button.clicked.connect(self.create_file_dialog)
-        self.create_idea_button = QPushButton("Create Idea")
-        self.create_idea_button.clicked.connect(self.create_idea_dialog)
-        self.load_idea_button = QPushButton("Load Idea")
-        self.load_idea_button.clicked.connect(self.load_idea_dialog)
-        self.delete_idea_button = QPushButton("Delete Idea")
-        self.delete_idea_button.clicked.connect(self.delete_idea_dialog)
-        self.list_ideas_button = QPushButton("List Ideas")
-        self.list_ideas_button.clicked.connect(self.list_ideas)
-        function_layout.addWidget(self.create_file_button)
-        function_layout.addWidget(self.create_idea_button)
-        function_layout.addWidget(self.load_idea_button)
-        function_layout.addWidget(self.delete_idea_button)
-        function_layout.addWidget(self.list_ideas_button)
+        buttons = [
+            ("Create File", self.create_file_dialog),
+            ("Create Idea", self.create_idea_dialog),
+            ("Load Idea", self.load_idea_dialog),
+            ("Delete Idea", self.delete_idea_dialog),
+            ("List Ideas", self.list_ideas)
+        ]
+        for text, func in buttons:
+            button = QPushButton(text)
+            button.clicked.connect(func)
+            function_layout.addWidget(button)
         self.layout.addLayout(function_layout)
 
         # Model selection
@@ -61,9 +71,80 @@ class LLMChatGUI(QMainWindow):
         self.select_model_button = QPushButton("Select Model")
         self.select_model_button.clicked.connect(self.select_model)
         model_layout.addWidget(QLabel("Model:"))
-        model_layout.addWidget(self.model_selector)
+        model_layout.addWidget(self.model_selector, 1)
         model_layout.addWidget(self.select_model_button)
         self.layout.addLayout(model_layout)
+
+    def apply_dark_theme(self):
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #2b2b2b;
+                color: #ffffff;
+                font-family: 'Roboto', sans-serif;
+                font-size: 14px;
+            }
+            QTextEdit, QLineEdit {
+                background-color: #3c3f41;
+                border: 1px solid #646464;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QPushButton {
+                background-color: #4a4a4a;
+                border: 1px solid #646464;
+                border-radius: 4px;
+                padding: 5px 10px;
+            }
+            QPushButton:hover {
+                background-color: #5a5a5a;
+            }
+            QComboBox {
+                background-color: #3c3f41;
+                border: 1px solid #646464;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: #3c3f41;
+                width: 10px;
+                margin: 0px 0px 0px 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #5a5a5a;
+                min-height: 20px;
+                border-radius: 5px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+
+    def send_message(self):
+        user_message = self.input_field.text()
+        self.add_message("User", user_message)
+        self.input_field.clear()
+
+        # Process the message and get LLM response
+        output = self.llm(prompt=user_message,
+                          max_tokens=self.llm_config["max_tokens"],
+                          stop=self.llm_config["stop"],
+                          temperature=self.llm_config["temperature"],
+                          top_p=self.llm_config["top_p"],
+                          top_k=self.llm_config["top_k"],
+                          min_p=self.llm_config["min_p"],
+                          repeat_penalty=self.llm_config["repeat_penalty"])
+        assistant_message = output["choices"][0]["text"]
+        self.add_message(self.llm_name, assistant_message)
+
+    def add_message(self, sender, message):
+        message_widget = QTextEdit()
+        message_widget.setReadOnly(True)
+        message_widget.setHtml(f"<b>{sender}:</b> {message}")
+        message_widget.setMaximumHeight(100)
+        self.chat_layout.addWidget(message_widget)
+
+    # ... (rest of the methods remain the same)
 
     def load_config(self):
         with open('llm_config.json', 'r') as file:
