@@ -1,65 +1,52 @@
 #For the future.
 import os, csv
+from PyQt6.QtWidgets import QInputDialog, QMessageBox
 BASE_DIR = os.getcwd()
 
-def model_selector():
+def model_selector(parent=None):
     folder_path = os.path.sep + "models"
     extension = ".gguf"
     files = [file for file in os.listdir(BASE_DIR + folder_path) if file.endswith(extension)]
     if not files:
-        print(f"No {extension} models found in the folder.")
-        return
+        QMessageBox.warning(parent, "Model Selection", f"No {extension} models found in the folder.")
+        return None
 
-    print("Available models:")
-    for i, file in enumerate(files, 1):
-        print(f"[{i}] {file}")
+    selected_file, ok = QInputDialog.getItem(parent, "Model Selection", "Select a model:", files, 0, False)
+    if ok and selected_file:
+        return selected_file
+    return None
+
+def llama_args(parent=None, n_gpu_layers_default=-1, n_ctx_default=16386):
+    var1, ok1 = QInputDialog.getInt(parent, "LLama Args", f"Change n_gpu_layers? (Default: {n_gpu_layers_default})", n_gpu_layers_default, -1, 100)
+    if not ok1:
+        return None, None
     
-    try:
-        choice = int(input("Enter the number of the model you want to select: "))
-        if 1 <= choice <= len(files):
-            selected_file = files[choice - 1]
-        else:
-            print("Invalid choice. Please enter a valid number.")
-    except ValueError:
-        print("Invalid input. Please enter a number.")
-
-    print(f"You selected: {selected_file}")
-    return selected_file
-
-def llama_args(n_gpu_layers_default=-1, n_ctx_default=16386):
-    var1 = input(f"Change n_gpu_layers? - Default [{n_gpu_layers_default}] (press Enter to use default): ") or n_gpu_layers_default
-    var2 = input(f"Change n_ctx? - Default [{n_ctx_default}] (press Enter to use default): ") or n_ctx_default
+    var2, ok2 = QInputDialog.getInt(parent, "LLama Args", f"Change n_ctx? (Default: {n_ctx_default})", n_ctx_default, 1, 100000)
+    if not ok2:
+        return None, None
     
     return int(var1), int(var2)
 
-def char_selector():
+def char_selector(parent=None):
     folder_path = "\history"
     extension = ".csv"
     shared_string = "history_"
 
-    files = [file for file in os.listdir(BASE_DIR + folder_path) if file.endswith(extension)]
+    files = [file.replace(shared_string, "").replace(extension, "") for file in os.listdir(BASE_DIR + folder_path) if file.endswith(extension)]
+    
     if not files:
-        choice_new = input("Provide a name for the new Char:")
-        return choice_new
+        new_char, ok = QInputDialog.getText(parent, "New Character", "Provide a name for the new character:")
+        if ok and new_char:
+            return new_char
+        return None
 
-    print("Available chars:")
-    for i, file in enumerate(files, 1):
-        display_name = file.replace(shared_string, "").replace(extension, "")
-        print(f"[{i}] {display_name}")
-
-    choice = input("Enter the number of the char you want or write the name for a new char: ")
-    try:
-        choice_int = int(choice)
-        if 1 <= choice_int <= len(files):
-            selected_char = files[choice - 1].replace(shared_string, "").replace(extension, "")
-            print(f"You selected: {selected_char}")
+    selected_char, ok = QInputDialog.getItem(parent, "Character Selection", "Select a character or enter a new name:", files, 0, True)
+    if ok and selected_char:
+        if selected_char in files:
             return selected_char
-        else:        
-            print("Invalid input. Please enter a correct number.")
-            return None
-    except:
-        print(f"You've created: {choice}")
-        return choice
+        else:
+            return selected_char  # This is a new character name
+    return None
 
 def prompter(role, content):
     message = '<|im_start|>'+ role +' \n' + content + '<|im_end|> \n'
